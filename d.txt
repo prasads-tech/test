@@ -1,3 +1,108 @@
+import os
+import sys
+import json
+import yaml
+import shutil
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def load_template(spec_name, env):
+    try:
+        template_file = f"{env}.yaml"
+        template_path = os.path.join(f'../AKS-Cluster-Specs/specifications/{spec_name}', template_file)
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"Template not found: {template_path}")
+        with open(template_path, 'r') as file:
+            template = yaml.safe_load(file)
+        return template
+    except FileNotFoundError as e:
+        raise e
+    except yaml.YAMLError:
+        raise ValueError(f"Error loading YAML template: {template_path}")
+
+def merge_spec_with_template(spec, template):
+    try:
+        for key, value in spec.items():
+            if key in template:
+                template[key] = value
+            else:
+                template[key] = value
+        return template
+    except KeyError as e:
+        raise KeyError(f"Missing required spec key: {e}")
+
+def save_to_iac_repo(merged_spec, output_filename, cluster_name):
+    output_path = os.path.join(f'../AKS-Cluster-IaC/clusters/{cluster_name}/definitions', output_filename)
+    if os.path.exists(output_path):
+        logger.info(f"Cluster definition already exists: {output_path}")
+        return
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, 'w') as file:
+        yaml.dump(merged_spec, file)
+    logger.info(f"Cluster definition saved to: {output_path}")
+
+def copy_configuration_files(spec_name, cluster_name):
+    config_source_dir = os.path.join(f'../AKS-Cluster-Specs/configurations/{spec_name}')
+    config_target_dir = os.path.join(f'../AKS-Cluster-IaC/clusters/{cluster_name}/configurations')
+
+    if not os.path.exists(config_source_dir):
+        logger.warning(f"No configuration files found for spec: {spec_name}")
+        return
+
+    os.makedirs(config_target_dir, exist_ok=True)
+
+    for filename in os.listdir(config_source_dir):
+        full_file_name = os.path.join(config_source_dir, filename)
+        if os.path.isfile(full_file_name):
+            shutil.copy(full_file_name, config_target_dir)
+            logger.info(f"Copied {filename} to {config_target_dir}")
+
+def main():
+    if len(sys.argv) != 3:
+        logger.error("Usage: python automation.py <json_spec_path> <spec_name>")
+        sys.exit(1)
+
+    json_spec_path = sys.argv[1]
+    spec_name = sys.argv[2]
+
+    try:
+        with open(json_spec_path, 'r') as file:
+            json_spec = json.load(file)
+
+        validate_spec(json_spec)
+
+        env = json_spec.get('env', 'dev')
+        cluster_name = json_spec.get('clusterName')
+        template = load_template(spec_name, env)
+        merged_spec = merge_spec_with_template(json_spec, template)
+
+        output_filename = f"{cluster_name}-cluster-definition.yaml"
+        save_to_iac_repo(merged_spec, output_filename, cluster_name)
+        copy_configuration_files(spec_name, cluster_name)
+    except FileNotFoundError as e:
+        logger.error(e)
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON file: {json_spec_path}")
+    except KeyError as e:
+        logger.error(e)
+    except ValueError as e:
+        logger.error(e)
+
+def validate_spec(spec):
+    required_keys = ['clusterName', 'env', 'workerNodeCount', 'controlPlaneCount', 'region', 'spec', 'kubernetesVersion', 'networkPolicy', 'storageClass']
+    for key in required_keys:
+        if key not in spec:
+            raise KeyError(f"Missing required key in spec: {key}")
+
+if __name__ == "__main__":
+    main()
+
+
+
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
