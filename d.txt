@@ -1,3 +1,39 @@
+name: Automation Workflow
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'AKS-Cluster-Provisioner/ClusterInputFolder/*.json'
+
+jobs:
+  trigger-automation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r AKS-Cluster-Provisioner/requirements.txt
+
+      - name: Run automation script
+        run: |
+          python AKS-Cluster-Provisioner/main.py shared AKS-Cluster-Provisioner/ClusterInputFolder/input1.json
+          python AKS-Cluster-Provisioner/main.py specific AKS-Cluster-Provisioner/ClusterInputFolder/input2.json
+          python AKS-Cluster-Provisioner/main.py special AKS-Cluster-Provisioner/ClusterInputFolder/input3.json
+
+
+
+
+
 import os
 import sys
 import json
