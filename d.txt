@@ -8,6 +8,200 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+SPEC_DIR = '../AKS-Cluster-Specs'
+IAC_DIR = '../AKS-Cluster-IaC'
+
+def load_template(spec_name, env):
+    """Load the YAML template based on the spec name and environment."""
+    try:
+        template_file = f"{env}.yaml"
+        template_path = os.path.join(SPEC_DIR, 'specifications', spec_name, template_file)
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"Template not found: {template_path}")
+        with open(template_path, 'r') as file:
+            template = yaml.safe_load(file)
+        return template
+    except FileNotFoundError as e:
+        logger.error(e)
+        raise
+    except yaml.YAMLError as e:
+        logger.error(f"Error loading YAML template: {template_path}")
+        raise ValueError(f"Error loading YAML template: {template_path}") from e
+
+def merge_spec_with_template(spec, template):
+    """Merge the JSON spec with the YAML template."""
+    try:
+        template.update(spec)
+        return template
+    except KeyError as e:
+        logger.error(f"Missing required spec key: {e}")
+        raise
+
+def save_to_iac_repo(merged_spec, output_filename, cluster_name):
+    """Save the merged spec to the IaC repository."""
+    output_path = os.path.join(IAC_DIR, 'clusters', cluster_name, 'definitions', output_filename)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, 'w') as file:
+        yaml.dump(merged_spec, file)
+    logger.info(f"Cluster definition saved to: {output_path}")
+
+def copy_configuration_files(spec_name, cluster_name):
+    """Copy configuration files to the appropriate directory in the IaC repository."""
+    config_source_dir = os.path.join(SPEC_DIR, 'configurations', spec_name)
+    config_target_dir = os.path.join(IAC_DIR, 'clusters', cluster_name, 'configurations')
+
+    if not os.path.exists(config_source_dir):
+        logger.warning(f"No configuration files found for spec: {spec_name}")
+        return
+
+    os.makedirs(config_target_dir, exist_ok=True)
+
+    for filename in os.listdir(config_source_dir):
+        full_file_name = os.path.join(config_source_dir, filename)
+        if os.path.isfile(full_file_name):
+            shutil.copy(full_file_name, config_target_dir)
+            logger.info(f"Copied {filename} to {config_target_dir}")
+
+def validate_spec(spec):
+    """Validate that the required keys are present in the spec."""
+    required_keys = [
+        'clusterName', 'env', 'workerNodeCount', 'controlPlaneCount', 'region',
+        'spec', 'kubernetesVersion', 'networkPolicy', 'storageClass'
+    ]
+    for key in required_keys:
+        if key not in spec:
+            raise KeyError(f"Missing required key in spec: {key}")
+
+def main():
+    """Main function to run the automation script."""
+    if len(sys.argv) != 3:
+        logger.error("Usage: python automation.py <json_spec_path> <spec_name>")
+        sys.exit(1)
+
+    json_spec_path = sys.argv[1]
+    spec_name = sys.argv[2]
+
+    try:
+        with open(json_spec_path, 'r') as file:
+            json_spec = json.load(file)
+
+        validate_spec(json_spec)
+
+        env = json_spec.get('env', 'dev')
+        cluster_name = json_spec.get('clusterName')
+        template = load_template(spec_name, env)
+        merged_spec = merge_spec_with_template(json_spec, template)
+
+        output_filename = f"{cluster_name}-cluster-definition.yaml"
+        save_to_iac_repo(merged_spec, output_filename, cluster_name)
+        copy_configuration_files(spec_name, cluster_name)
+    except FileNotFoundError as e:
+        logger.error(e)
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON file: {json_spec_path}")
+    except KeyError as e:
+        logger.error(e)
+    except ValueError as e:
+        logger.error(e)
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+
+
+
+
+
+import os
+import sys
+import json
+import subprocess
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def process_json_specs(specs_dir, json_file, spec_name):
+    """Process JSON specs and call the automation script."""
+    json_spec_path = os.path.join(specs_dir, json_file)
+    process_single_spec(json_spec_path, spec_name)
+
+def process_single_spec(json_spec_path, spec_name):
+    """Process a single JSON spec file."""
+    try:
+        with open(json_spec_path, 'r') as file:
+            json_spec = json.load(file)
+
+        temp_json_path = 'temp_spec.json'
+        with open(temp_json_path, 'w') as temp_file:
+            json.dump(json_spec, temp_file)
+
+        subprocess.run(['python', 'src/automation.py', temp_json_path, spec_name], check=True)
+    except FileNotFoundError:
+        logger.error(f"File not found: {json_spec_path}")
+    except json.JSONDecodeError:
+        logger.error(f"Error decoding JSON file: {json_spec_path}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error running automation script: {e}")
+
+def main():
+    """Main function to run the main script."""
+    if len(sys.argv) != 3:
+        logger.error("Usage: python main.py <spec_name> <json_input_file>")
+        sys.exit(1)
+    
+    spec_name = sys.argv[1]
+    json_file = sys.argv[2]
+
+    specs_dir = 'ClusterInputFolder'
+    if not os.path.exists(specs_dir):
+        logger.error(f"Specs directory does not exist: {specs_dir}")
+        return
+
+    process_json_specs(specs_dir, json_file, spec_name)
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import os
+import sys
+import json
+import yaml
+import shutil
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def load_template(spec_name, env):
     try:
         template_file = f"{env}.yaml"
