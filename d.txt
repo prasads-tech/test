@@ -1,3 +1,46 @@
+{
+  "clusterName": "dev-cluster",
+  "env": "dev",
+  "workerNodeCount": 3,
+  "controlPlaneCount": 1,
+  "region": "eastus",
+  "spec": "shared",
+  "kubernetesVersion": "1.20.7",
+  "networkPolicy": "calico",
+  "storageClass": "default"
+}
+
+
+
+
+apiVersion: v1
+kind: Cluster
+metadata:
+  name: {{ clusterName }}
+  labels:
+    env: {{ env }}
+spec:
+  version: {{ kubernetesVersion }}
+  controlPlane:
+    count: {{ controlPlaneCount }}
+    nodeType: Standard_DS2_v2
+  workerNodes:
+    count: {{ workerNodeCount }}
+    nodeType: Standard_DS2_v2
+  network:
+    policy: {{ networkPolicy }}
+  storage:
+    class: {{ storageClass }}
+  region: {{ region }}
+
+
+
+
+
+
+
+
+
 import os
 import sys
 import json
