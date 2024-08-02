@@ -1,3 +1,32 @@
+# AKS Cluster Automation
+
+This repository contains scripts and automation for deploying AKS clusters using a specified configuration and template.
+
+## Folder Structure
+
+- `ClusterInputFolder/`: Contains JSON input files for cluster specifications.
+- `AKS-Cluster-Specs/`: Contains specifications, definitions, and configurations for clusters.
+- `src/`: Contains the main Python scripts for automation.
+
+## Scripts
+
+- `main.py`: Main entry point for processing JSON input files.
+- `automation.py`: Handles the creation and saving of cluster definitions and configuration files.
+
+## Running Locally
+
+To run the automation scripts locally, use the following command:
+
+```sh
+python src/main.py <spec_name> <json_input_file>
+
+
+
+
+
+
+
+
 name: Automation Workflow
 
 on:
