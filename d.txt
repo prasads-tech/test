@@ -1,3 +1,73 @@
+""" Main Module """
+import os
+import sys
+import json
+import subprocess
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
+
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+SPECS_DIR = os.getenv('SPECS_DIR')
+AUTOMATION_SCRIPT = os.getenv('AUTOMATION_SCRIPT')
+
+
+class MainProcessor:
+    def __init__(self, spec_name, json_file):
+        self.spec_name = spec_name
+        self.json_file = json_file
+
+    def process_json_specs(self):
+        """Process JSON specs and call automation script"""
+        json_spec_path = os.path.join(SPECS_DIR, self.json_file)
+        self.process_single_spec(json_spec_path)
+
+    def process_single_spec(self, json_spec_path):
+        """Process single JSON spec file."""
+        try:
+            with open(json_spec_path, "r", encoding='utf-8') as file:
+                json_spec = json.load(file)
+
+            subprocess.run(
+                ["python", AUTOMATION_SCRIPT, json_spec_path, self.spec_name],
+                check=True
+            )
+        except FileNotFoundError:
+            logger.error("File not found: %s", json_spec_path)
+        except json.JSONDecodeError:
+            logger.error("Error decoding JSON file: %s", json_spec_path)
+        except subprocess.CalledProcessError as e:
+            logger.error("Error running automation script: %s", e)
+
+
+def main():
+    """Main function to run the main script"""
+    if len(sys.argv) != 3:
+        logger.error("Usage: python main.py <spec_name> <json_input_file>")
+        sys.exit(1)
+
+    spec_name = sys.argv[1]
+    json_file = sys.argv[2]
+
+    if not os.path.exists(SPECS_DIR):
+        logger.error("Specs directory does not exist: %s", SPECS_DIR)
+        return
+
+    processor = MainProcessor(spec_name, json_file)
+    processor.process_json_specs()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
 """ Automation Module """
 import os
 import sys
