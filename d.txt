@@ -5,6 +5,513 @@ import json
 import shutil
 import logging
 import yaml
+from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
+
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+SPEC_DIR = os.getenv('SPEC_DIR')
+IAC_DIR = os.getenv('IAC_DIR')
+
+
+class Automation:
+    def __init__(self, spec_name, json_spec_path):
+        self.spec_name = spec_name
+        self.json_spec_path = json_spec_path
+
+    def load_template(self, env):
+        """Load YAML template based on the spec name and env"""
+        try:
+            template_file = f"{env}.yaml"
+            template_path = os.path.join(
+                SPEC_DIR, "specifications", self.spec_name, template_file
+            )
+            if not os.path.exists(template_path):
+                raise FileNotFoundError(f"Template not found: {template_path}")
+            with open(template_path, "r", encoding='utf-8') as file:
+                template = yaml.safe_load(file)
+            return template
+        except FileNotFoundError as e:
+            logger.error("%s", e)
+            raise
+        except yaml.YAMLError as e:
+            logger.error("Error loading YAML template: %s", template_path)
+            raise ValueError(f"Error loading YAML template: {template_path}") from e
+
+    def merge_spec_with_template(self, spec, template):
+        """Merge JSON spec with YAML template."""
+        try:
+            template.update(spec)
+            return template
+        except KeyError as e:
+            logger.error("Missing required spec key: %s", e)
+            raise
+
+    def save_to_iac_repo(self, merged_spec, output_filename, cluster_name):
+        """Save merged spec to the IaC repository"""
+        output_path = os.path.join(
+            IAC_DIR, "clusters", cluster_name, "definitions", output_filename
+        )
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding='utf-8') as file:
+            yaml.dump(merged_spec, file)
+        logger.info("Cluster definition saved to: %s", output_path)
+
+    def copy_configuration_files(self, cluster_name):
+        """Copy config files to IaC repository."""
+        config_source_dir = os.path.join(SPEC_DIR, "configurations", self.spec_name)
+        config_target_dir = os.path.join(
+            IAC_DIR, "clusters", cluster_name, "configurations"
+        )
+
+        if not os.path.exists(config_source_dir):
+            logger.warning("No configuration files found for spec: %s", self.spec_name)
+            return
+
+        os.makedirs(config_target_dir, exist_ok=True)
+
+        for filename in os.listdir(config_source_dir):
+            full_file_name = os.path.join(config_source_dir, filename)
+            if os.path.isfile(full_file_name):
+                shutil.copy(full_file_name, config_target_dir)
+                logger.info("Copied %s to %s", filename, config_target_dir)
+
+    def validate_spec(self, spec):
+        """Validate required keys are present in the spec"""
+        required_keys = [
+            "clusterName",
+            "env",
+            "workerNodeCount",
+            "controlPlaneCount",
+            "region",
+            "spec",
+            "kubernetesVersion",
+            "networkPolicy",
+            "storageClass",
+        ]
+        for key in required_keys:
+            if key not in spec:
+                raise KeyError(f"Missing required key in spec: {key}")
+
+    def run(self):
+        """Run the automation process"""
+        try:
+            with open(self.json_spec_path, "r", encoding='utf-8') as file:
+                json_spec = json.load(file)
+
+            self.validate_spec(json_spec)
+
+            env = json_spec.get("env", "dev")
+            cluster_name = json_spec.get("clusterName")
+            template = self.load_template(env)
+            merged_spec = self.merge_spec_with_template(json_spec, template)
+
+            output_filename = f"{cluster_name}-cluster-definition.yaml"
+            self.save_to_iac_repo(merged_spec, output_filename, cluster_name)
+            self.copy_configuration_files(cluster_name)
+        except FileNotFoundError as e:
+            logger.error(e)
+        except json.JSONDecodeError:
+            logger.error("Error decoding JSON file: %s", self.json_spec_path)
+        except KeyError as e:
+            logger.error(e)
+        except ValueError as e:
+            logger.error(e)
+
+
+def main():
+    """Main function to run the automation script"""
+    if len(sys.argv) != 3:
+        logger.error("Usage: python automation.py <json_spec_path> <spec_name>")
+        sys.exit(1)
+
+    json_spec_path = sys.argv[1]
+    spec_name = sys.argv[2]
+
+    automation = Automation(spec_name, json_spec_path)
+    automation.run()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+""" Automation Module """
+import os
+import sys
+import json
+import shutil
+import logging
+import yaml
+from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
+
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+SPEC_DIR = os.getenv('SPEC_DIR')
+IAC_DIR = os.getenv('IAC_DIR')
+
+
+class Automation:
+    def __init__(self, spec_name, json_spec_path):
+        self.spec_name = spec_name
+        self.json_spec_path = json_spec_path
+
+    def load_template(self, env):
+        """Load YAML template based on the spec name and env"""
+        try:
+            template_file = f"{env}.yaml"
+            template_path = os.path.join(
+                SPEC_DIR, "specifications", self.spec_name, template_file
+            )
+            if not os.path.exists(template_path):
+                raise FileNotFoundError(f"Template not found: {template_path}")
+            with open(template_path, "r", encoding='utf-8') as file:
+                template = yaml.safe_load(file)
+            return template
+        except FileNotFoundError as e:
+            logger.error("%s", e)
+            raise
+        except yaml.YAMLError as e:
+            logger.error("Error loading YAML template: %s", template_path)
+            raise ValueError(f"Error loading YAML template: {template_path}") from e
+
+    def merge_spec_with_template(self, spec, template):
+        """Merge JSON spec with YAML template."""
+        try:
+            template.update(spec)
+            return template
+        except KeyError as e:
+            logger.error("Missing required spec key: %s", e)
+            raise
+
+    def save_to_iac_repo(self, merged_spec, output_filename, cluster_name):
+        """Save merged spec to the IaC repository"""
+        output_path = os.path.join(
+            IAC_DIR, "clusters", cluster_name, "definitions", output_filename
+        )
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding='utf-8') as file:
+            yaml.dump(merged_spec, file)
+        logger.info("Cluster definition saved to: %s", output_path)
+
+    def copy_configuration_files(self, cluster_name):
+        """Copy config files to IaC repository."""
+        config_source_dir = os.path.join(SPEC_DIR, "configurations", self.spec_name)
+        config_target_dir = os.path.join(
+            IAC_DIR, "clusters", cluster_name, "configurations"
+        )
+
+        if not os.path.exists(config_source_dir):
+            logger.warning("No configuration files found for spec: %s", self.spec_name)
+            return
+
+        os.makedirs(config_target_dir, exist_ok=True)
+
+        for filename in os.listdir(config_source_dir):
+            full_file_name = os.path.join(config_source_dir, filename)
+            if os.path.isfile(full_file_name):
+                shutil.copy(full_file_name, config_target_dir)
+                logger.info("Copied %s to %s", filename, config_target_dir)
+
+    def validate_spec(self, spec):
+        """Validate required keys are present in the spec"""
+        required_keys = [
+            "clusterName",
+            "env",
+            "workerNodeCount",
+            "controlPlaneCount",
+            "region",
+            "spec",
+            "kubernetesVersion",
+            "networkPolicy",
+            "storageClass",
+        ]
+        for key in required_keys:
+            if key not in spec:
+                raise KeyError(f"Missing required key in spec: {key}")
+
+    def run(self):
+        """Run the automation process"""
+        try:
+            with open(self.json_spec_path, "r", encoding='utf-8') as file:
+                json_spec = json.load(file)
+
+            self.validate_spec(json_spec)
+
+            env = json_spec.get("env", "dev")
+            cluster_name = json_spec.get("clusterName")
+            template = self.load_template(env)
+            merged_spec = self.merge_spec_with_template(json_spec, template)
+
+            output_filename = f"{cluster_name}-cluster-definition.yaml"
+            self.save_to_iac_repo(merged_spec, output_filename, cluster_name)
+            self.copy_configuration_files(cluster_name)
+        except FileNotFoundError as e:
+            logger.error(e)
+        except json.JSONDecodeError:
+            logger.error("Error decoding JSON file: %s", self.json_spec_path)
+        except KeyError as e:
+            logger.error(e)
+        except ValueError as e:
+            logger.error(e)
+
+
+def main():
+    """Main function to run the automation script"""
+    if len(sys.argv) != 3:
+        logger.error("Usage: python automation.py <json_spec_path> <spec_name>")
+        sys.exit(1)
+
+    json_spec_path = sys.argv[1]
+    spec_name = sys.argv[2]
+
+    automation = Automation(spec_name, json_spec_path)
+    automation.run()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+""" Automation Module """
+import os
+import sys
+import json
+import shutil
+import logging
+import yaml
+from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
+
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+SPEC_DIR = os.getenv('SPEC_DIR')
+IAC_DIR = os.getenv('IAC_DIR')
+
+
+class Automation:
+    def __init__(self, spec_name, json_spec_path):
+        self.spec_name = spec_name
+        self.json_spec_path = json_spec_path
+
+    def load_template(self, env):
+        """Load YAML template based on the spec name and env"""
+        try:
+            template_file = f"{env}.yaml"
+            template_path = os.path.join(
+                SPEC_DIR, "specifications", self.spec_name, template_file
+            )
+            if not os.path.exists(template_path):
+                raise FileNotFoundError(f"Template not found: {template_path}")
+            with open(template_path, "r", encoding='utf-8') as file:
+                template = yaml.safe_load(file)
+            return template
+        except FileNotFoundError as e:
+            logger.error("%s", e)
+            raise
+        except yaml.YAMLError as e:
+            logger.error("Error loading YAML template: %s", template_path)
+            raise ValueError(f"Error loading YAML template: {template_path}") from e
+
+    def merge_spec_with_template(self, spec, template):
+        """Merge JSON spec with YAML template."""
+        try:
+            template.update(spec)
+            return template
+        except KeyError as e:
+            logger.error("Missing required spec key: %s", e)
+            raise
+
+    def save_to_iac_repo(self, merged_spec, output_filename, cluster_name):
+        """Save merged spec to the IaC repository"""
+        output_path = os.path.join(
+            IAC_DIR, "clusters", cluster_name, "definitions", output_filename
+        )
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding='utf-8') as file:
+            yaml.dump(merged_spec, file)
+        logger.info("Cluster definition saved to: %s", output_path)
+
+    def copy_configuration_files(self, cluster_name):
+        """Copy config files to IaC repository."""
+        config_source_dir = os.path.join(SPEC_DIR, "configurations", self.spec_name)
+        config_target_dir = os.path.join(
+            IAC_DIR, "clusters", cluster_name, "configurations"
+        )
+
+        if not os.path.exists(config_source_dir):
+            logger.warning("No configuration files found for spec: %s", self.spec_name)
+            return
+
+        os.makedirs(config_target_dir, exist_ok=True)
+
+        for filename in os.listdir(config_source_dir):
+            full_file_name = os.path.join(config_source_dir, filename)
+            if os.path.isfile(full_file_name):
+                shutil.copy(full_file_name, config_target_dir)
+                logger.info("Copied %s to %s", filename, config_target_dir)
+
+    def validate_spec(self, spec):
+        """Validate required keys are present in the spec"""
+        required_keys = [
+            "clusterName",
+            "env",
+            "workerNodeCount",
+            "controlPlaneCount",
+            "region",
+            "spec",
+            "kubernetesVersion",
+            "networkPolicy",
+            "storageClass",
+        ]
+        for key in required_keys:
+            if key not in spec:
+                raise KeyError(f"Missing required key in spec: {key}")
+
+    def run(self):
+        """Run the automation process"""
+        try:
+            with open(self.json_spec_path, "r", encoding='utf-8') as file:
+                json_spec = json.load(file)
+
+            self.validate_spec(json_spec)
+
+            env = json_spec.get("env", "dev")
+            cluster_name = json_spec.get("clusterName")
+            template = self.load_template(env)
+            merged_spec = self.merge_spec_with_template(json_spec, template)
+
+            output_filename = f"{cluster_name}-cluster-definition.yaml"
+            self.save_to_iac_repo(merged_spec, output_filename, cluster_name)
+            self.copy_configuration_files(cluster_name)
+        except FileNotFoundError as e:
+            logger.error(e)
+        except json.JSONDecodeError:
+            logger.error("Error decoding JSON file: %s", self.json_spec_path)
+        except KeyError as e:
+            logger.error(e)
+        except ValueError as e:
+            logger.error(e)
+
+
+def main():
+    """Main function to run the automation script"""
+    if len(sys.argv) != 3:
+        logger.error("Usage: python automation.py <json_spec_path> <spec_name>")
+        sys.exit(1)
+
+    json_spec_path = sys.argv[1]
+    spec_name = sys.argv[2]
+
+    automation = Automation(spec_name, json_spec_path)
+    automation.run()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+import os
+import pytest
+import subprocess
+from src.main import MainProcessor
+
+@pytest.fixture
+def setup_env():
+    os.environ['SPECS_DIR'] = './ClusterInputFolder'
+    os.environ['AUTOMATION_SCRIPT'] = './src/automation.py'
+    yield
+    del os.environ['SPECS_DIR']
+    del os.environ['AUTOMATION_SCRIPT']
+
+def test_process_single_spec(mocker, setup_env):
+    mocker.patch('builtins.open', mocker.mock_open(read_data='{"key": "value"}'))
+    mocker.patch('subprocess.run')
+    processor = MainProcessor("example_spec", "dummy_file.json")
+    processor.process_single_spec("./ClusterInputFolder/dummy_file.json")
+    subprocess.run.assert_called_once_with(['python', './src/automation.py', './ClusterInputFolder/dummy_file.json', 'example_spec'], check=True)
+
+
+
+
+import os
+import pytest
+import yaml
+from src.automation import Automation
+
+@pytest.fixture
+def setup_env():
+    os.environ['SPEC_DIR'] = './AKS-Cluster-Specs'
+    os.environ['IAC_DIR'] = './AKS-Cluster-IaC'
+    yield
+    del os.environ['SPEC_DIR']
+    del os.environ['IAC_DIR']
+
+def test_load_template(setup_env):
+    automation = Automation("example_spec", "dummy_path")
+    template = automation.load_template("dev")
+    assert template is not None
+
+def test_merge_spec_with_template():
+    automation = Automation("example_spec", "dummy_path")
+    template = {"key1": "value1"}
+    spec = {"key2": "value2"}
+    merged = automation.merge_spec_with_template(spec, template)
+    assert merged["key1"] == "value1"
+    assert merged["key2"] == "value2"
+
+def test_save_to_iac_repo(mocker):
+    mocker.patch('builtins.open', mocker.mock_open())
+    mocker.patch('os.makedirs')
+    automation = Automation("example_spec", "dummy_path")
+    automation.save_to_iac_repo({"key": "value"}, "output.yaml", "example_cluster")
+    os.makedirs.assert_called_once()
+    open.assert_called_once_with('./AKS-Cluster-IaC/clusters/example_cluster/definitions/output.yaml', 'w', encoding='utf-8')
+
+def test_copy_configuration_files(mocker):
+    mocker.patch('os.path.exists', return_value=True)
+    mocker.patch('os.makedirs')
+    mocker.patch('shutil.copy')
+    mocker.patch('os.listdir', return_value=["config1.yaml"])
+    automation = Automation("example_spec", "dummy_path")
+    automation.copy_configuration_files("example_cluster")
+    os.makedirs.assert_called_once()
+    shutil.copy.assert_called_once()
+
+
+
+
+
+
+
+
+
+
+
+
+
+""" Automation Module """
+import os
+import sys
+import json
+import shutil
+import logging
+import yaml
 from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 
