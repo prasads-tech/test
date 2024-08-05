@@ -1,3 +1,90 @@
+"""Tests for the Automation module"""
+import os
+import pytest
+import yaml
+from src.automation import Automation
+
+
+@pytest.fixture
+def setup_env():
+    os.environ['SPEC_DIR'] = './AKS-Cluster-Specs'
+    os.environ['IAC_DIR'] = './AKS-Cluster-IaC'
+    yield
+    del os.environ['SPEC_DIR']
+    del os.environ['IAC_DIR']
+
+
+def test_load_template(setup_env):
+    """Test loading a YAML template"""
+    automation = Automation("example_spec", "dummy_path")
+    template = automation.load_template("dev")
+    assert template is not None
+
+
+def test_merge_spec_with_template():
+    """Test merging JSON spec with YAML template"""
+    automation = Automation("example_spec", "dummy_path")
+    template = {"key1": "value1"}
+    spec = {"key2": "value2"}
+    merged = automation.merge_spec_with_template(spec, template)
+    assert merged["key1"] == "value1"
+    assert merged["key2"] == "value2"
+
+
+def test_save_to_iac_repo(mocker):
+    """Test saving the merged spec to the IaC repository"""
+    mocker.patch('builtins.open', mocker.mock_open())
+    mocker.patch('os.makedirs')
+    automation = Automation("example_spec", "dummy_path")
+    automation.save_to_iac_repo({"key": "value"}, "output.yaml", "example_cluster")
+    os.makedirs.assert_called_once()
+    open.assert_called_once_with('./AKS-Cluster-IaC/clusters/example_cluster/definitions/output.yaml', 'w', encoding='utf-8')
+
+
+def test_copy_configuration_files(mocker):
+    """Test copying configuration files to the IaC repository"""
+    mocker.patch('os.path.exists', return_value=True)
+    mocker.patch('os.makedirs')
+    mocker.patch('shutil.copy')
+    mocker.patch('os.listdir', return_value=["config1.yaml"])
+    automation = Automation("example_spec", "dummy_path")
+    automation.copy_configuration_files("example_cluster")
+    os.makedirs.assert_called_once()
+    shutil.copy.assert_called_once()
+
+
+
+
+
+
+"""Tests for the Main module"""
+import os
+import pytest
+import subprocess
+from src.main import MainProcessor
+
+
+@pytest.fixture
+def setup_env():
+    os.environ['SPECS_DIR'] = './ClusterInputFolder'
+    os.environ['AUTOMATION_SCRIPT'] = './src/automation.py'
+    yield
+    del os.environ['SPECS_DIR']
+    del os.environ['AUTOMATION_SCRIPT']
+
+
+def test_process_single_spec(mocker, setup_env):
+    """Test processing a single JSON spec file"""
+    mocker.patch('builtins.open', mocker.mock_open(read_data='{"key": "value"}'))
+    mocker.patch('subprocess.run')
+    processor = MainProcessor("example_spec", "dummy_file.json")
+    processor.process_single_spec("./ClusterInputFolder/dummy_file.json")
+    subprocess.run.assert_called_once_with(['python', './src/automation.py', './ClusterInputFolder/dummy_file.json', 'example_spec'], check=True)
+
+
+
+
+
 """ Main Module """
 import os
 import sys
