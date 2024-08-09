@@ -1,3 +1,17 @@
+# Directory paths
+SPECS_DIR=/path/to/AKS-Cluster-Specs
+AUTOMATION_SCRIPT=/path/to/automation/automation.py
+DEFAULT_JSON_FILE=/path/to/AKS-Cluster-Specs/specifications/shared/shared-latest.json
+DEFAULT_SPEC_NAME=/path/to/AKS-Cluster-Specs/definitions/general-medium/general-medium-latest.yaml
+
+# Other environment-specific variables
+IAC_DIR=/path/to/IAC/Repo
+SPEC_DIR=/path/to/AKS-Cluster-Specs
+
+
+
+
+
 """ Automation Module """
 import os
 import sys
